@@ -23,7 +23,7 @@ class Database:
         self.connection = sqlite3.connect(self.db_name)
         self.cursor = self.connection.cursor()
 
-    def create_users_table(self):
+    def create_links_table(self):
         """
         Создает таблицу WikiLinks, если она не существует.
         """
@@ -55,7 +55,7 @@ class Database:
         except Exception as e:
             print(f"Ошибка при вставке ссылки: {e}")
 
-    def fetch_all_links(self):
+    def fetch_all_links(self) -> list[tuple[int, str]]:
         """
         Возвращает все ссылки на статьи из таблицы WikiLinks.
 

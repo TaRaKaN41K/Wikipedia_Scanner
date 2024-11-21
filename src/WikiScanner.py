@@ -1,5 +1,5 @@
 import urllib.request
-from urllib.parse import urljoin, unquote
+from urllib.parse import urljoin
 from html.parser import HTMLParser
 import time
 
@@ -9,7 +9,7 @@ class WikiScanner(HTMLParser):
     Класс для парсинга страниц Википедии, извлечения ссылок и проверки перенаправлений.
     """
 
-    def __init__(self, max_depth: int = 6):
+    def __init__(self):
         """
         Инициализация экземпляра WikiScanner.
 
