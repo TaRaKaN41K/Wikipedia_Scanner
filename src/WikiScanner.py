@@ -3,6 +3,8 @@ from urllib.parse import urljoin
 from html.parser import HTMLParser
 import time
 
+import asyncio
+
 
 class WikiScanner(HTMLParser):
     """
@@ -87,7 +89,15 @@ class WikiScanner(HTMLParser):
         self.target_div_num = 0
         self.div_count = 0
 
-    def fetch_links(self, url: str) -> None:
+    @staticmethod
+    def _load_page(url: str) -> str:
+        """
+        Загрузка страницы (синхронная).
+        """
+        with urllib.request.urlopen(url) as response:
+            return response.read().decode("utf-8")
+
+    async def fetch_links(self, url: str) -> None:
         """
         Загрузка веб-страницы и извлечение ссылок.
 
@@ -95,14 +105,16 @@ class WikiScanner(HTMLParser):
         :raises Exception: В случае ошибки загрузки или парсинга страницы.
         """
         self.reset_parser()
+        loop = asyncio.get_running_loop()
         try:
-            response = urllib.request.urlopen(url)
-            content = response.read().decode("utf-8")
+            content = await loop.run_in_executor(None, self._load_page, url)
+            # response = urllib.request.urlopen(url)
+            # content = response.read().decode("utf-8")
             self.feed(content)
         except Exception as e:
             raise Exception(f"Ошибка загрузки страницы {url}: {e}")
 
-    def check_redirect(self, link: str) -> None:
+    async def check_redirect(self, link: str) -> None:
         """
         Проверка, является ли ссылка перенаправлением.
 
@@ -110,15 +122,17 @@ class WikiScanner(HTMLParser):
         :raises Exception: В случае ошибки проверки перенаправления.
         """
         self.reset_parser()
+        loop = asyncio.get_running_loop()
         try:
-            request_url = f"{link}?redirect=no"
-            response = urllib.request.urlopen(request_url)
-            content = response.read().decode("utf-8")
+            # request_url = f"{link}?redirect=no"
+            # response = urllib.request.urlopen(request_url)
+            # content = response.read().decode("utf-8")
+            content = await loop.run_in_executor(None, self._load_page, f"{link}?redirect=no")
             self.feed(content)
         except Exception as e:
             raise Exception(f"Ошибка проверки перенаправления для {link}: {e}")
 
-    def start_scanning(self, start_url: str) -> set[str]:
+    async def start_scanning(self, start_url: str) -> set[str]:
         """
         Запуск сканирования с указанного URL.
 
@@ -126,16 +140,90 @@ class WikiScanner(HTMLParser):
         :return: Множество уникальных ссылок (включая целевые URL перенаправлений).
         """
         self.start_url = start_url
-        self.fetch_links(start_url)
+        await self.fetch_links(start_url)
 
         result_links = set(self.links)
         links = set(self.links)
 
         for link in links:
-            self.check_redirect(link)
+            await self.check_redirect(link)
             if len(self.redirect_links) == 1:
                 result_links.remove(link)
                 result_links |= set(self.redirect_links)
             time.sleep(1)
 
         return result_links
+
+# import asyncio
+# from urllib.request import urlopen
+# from html.parser import HTMLParser
+#
+#
+# class AsyncLinkScanner(HTMLParser):
+#     def __init__(self):
+#         super().__init__()
+#         self.links = set()
+#         self.redirect_links = set()
+#         self.start_url = ""
+#
+#     def reset_parser(self):
+#         self.links.clear()
+#         self.redirect_links.clear()
+#
+#     def handle_starttag(self, tag, attrs):
+#         if tag == "a":
+#             for attr_name, attr_value in attrs:
+#                 if attr_name == "href":
+#                     self.links.add(attr_value)
+#
+#     async def fetch_links(self, url: str) -> None:
+#         """
+#         Асинхронная загрузка веб-страницы и извлечение ссылок.
+#         """
+#         self.reset_parser()
+#         loop = asyncio.get_running_loop()
+#         try:
+#             # Выполнение загрузки страницы в отдельном потоке
+#             content = await loop.run_in_executor(None, self._load_page, url)
+#             self.feed(content)
+#         except Exception as e:
+#             raise Exception(f"Ошибка загрузки страницы {url}: {e}")
+#
+#     async def check_redirect(self, link: str) -> None:
+#         """
+#         Асинхронная проверка, является ли ссылка перенаправлением.
+#         """
+#         self.reset_parser()
+#         loop = asyncio.get_running_loop()
+#         try:
+#             # Выполнение проверки перенаправления в отдельном потоке
+#             content = await loop.run_in_executor(None, self._load_page, f"{link}?redirect=no")
+#             self.feed(content)
+#         except Exception as e:
+#             raise Exception(f"Ошибка проверки перенаправления для {link}: {e}")
+#
+#     def _load_page(self, url: str) -> str:
+#         """
+#         Загрузка страницы (синхронная).
+#         """
+#         with urlopen(url) as response:
+#             return response.read().decode("utf-8")
+#
+#     async def start_scanning(self, start_url: str) -> set[str]:
+#         """
+#         Асинхронный запуск сканирования с указанного URL.
+#         """
+#         self.start_url = start_url
+#         await self.fetch_links(start_url)
+#
+#         result_links = set(self.links)
+#         links = set(self.links)
+#
+#         for link in links:
+#             await self.check_redirect(link)
+#             if len(self.redirect_links) == 1:
+#                 result_links.remove(link)
+#                 result_links |= set(self.redirect_links)
+#             await asyncio.sleep(1)  # Асинхронная задержка
+#
+#         return result_links
