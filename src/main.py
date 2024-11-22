@@ -10,23 +10,17 @@ async def main() -> None:
 
     print(f"Начинаем сканирование с {unquote(start_url)}")
 
-    result_links = await depth_scanning(url=start_url, max_depth=depth)
+    start_urls: list[str] = [start_url]
 
-    print(f"Найдено {len(result_links)} уникальных ссылок:")
-    for link in result_links:
-        print(unquote(link))
+    visited_links = await depth_scanning(urls=start_urls, max_depth=depth)
+
+    print(f"\nВсего посещено {len(visited_links)} уникальных ссылок.")
+
+    return None
 
 
-async def depth_scanning(url: str, max_depth: int, current_depth: int = 1, visited_links: set[str] = None) -> set[str]:
-    """
-    Рекурсивное сканирование ссылок на Википедии.
+async def depth_scanning(urls: list[str], max_depth: int, current_depth: int = 1, visited_links: set[str] = None) -> set[str]:
 
-    :param url: Начальная ссылка.
-    :param max_depth: Максимальная глубина обхода.
-    :param current_depth: Текущая глубина (по умолчанию 1).
-    :param visited_links: Набор уже посещенных ссылок (по умолчанию None).
-    :return: Набор уникальных ссылок, найденных в процессе сканирования.
-    """
     if visited_links is None:
         visited_links = set()
 
@@ -34,31 +28,44 @@ async def depth_scanning(url: str, max_depth: int, current_depth: int = 1, visit
     if current_depth > max_depth:
         return visited_links
 
-    print(f"Сканируем уровень {current_depth}, ссылка: {unquote(url)}")
-
     # Сканируем начальную ссылку
     try:
-        new_links = await scanner.start_scanning(start_url=url)
-        visited_links.add(url)
-        print(f'\nНайдено {len(new_links)} ссылок:')
-        for link in new_links:
-            print(unquote(link))
+        tasks = []
+
+        # Создаём задачи для проверки всех ссылок
+        for url in urls:
+            if url not in visited_links:
+                tasks.append(scanner.start_scanning(start_url=url, current_depth=current_depth))
+                await asyncio.sleep(0.1)  # Задержка между задачами
+
+        results: list[dict[str, set[str]]] = list(await asyncio.gather(*tasks))
+
+        for result in results:
+            visited_links.add(list(result.keys())[0])
+            print(f'\nНайдено {len(list(result.values())[0])} ссылок на уровне {current_depth}')
+            # for link in list(result.values())[0]:
+            #     print(unquote(link))
+
     except Exception as e:
-        print(f"Ошибка при сканировании {unquote(url)}: {e}")
+        print(f"Ошибка при сканировании: {e}")
         return visited_links
 
     db_links_tuple: list[tuple[int, str]] = db.fetch_all_links()
     db_links: list[str] = [link for _, link in db_links_tuple]
 
-    # Сохраняем новые ссылки в базу данных и обновляем список посещённых ссылок
-    for link in new_links:
-        if unquote(link) not in db_links:
-            db.insert_link(url=str(unquote(link)))
+    # Сохраняем новые ссылки в базу данных
+    for result in results:
+        for link in list(result.values())[0]:
+            if unquote(link) not in db_links:
+                db.insert_link(url=str(unquote(link)))
 
-    # Рекурсивно сканируем каждую новую ссылку
-    for link in new_links:
-        if link not in visited_links:
-            await depth_scanning(link, max_depth, current_depth + 1, visited_links)
+        # Рекурсивно сканируем каждую новую ссылку
+        await depth_scanning(
+            urls=list(list(result.values())[0]),
+            max_depth=max_depth,
+            current_depth=current_depth + 1,
+            visited_links=visited_links
+        )
 
     return visited_links
 
@@ -97,9 +104,5 @@ if __name__ == "__main__":
     scanner = WikiScanner()
     db = Database(db_path)
     db.create_links_table()
-
-    # start_url = 'https://ru.wikipedia.org/wiki/%D0%9C%D1%83%D0%B6_%D0%B8_%D0%B6%D0%B5%D0%BD%D0%B0'
-    # start_url = 'https://ru.wikipedia.org/wiki/%D0%92%D0%B5%D0%BB%D0%B8%D0%BA%D0%BE%D0%B5_(%D0%BE%D0%B7%D0%B5%D1%80%D0%BE,_%D0%92%D1%8F%D0%B7%D0%BD%D0%B8%D0%BA%D0%BE%D0%B2%D1%81%D0%BA%D0%B8%D0%B9_%D1%80%D0%B0%D0%B9%D0%BE%D0%BD)'
-    # start_url = 'https://ru.wikipedia.org/wiki/%D0%9A%D1%80%D0%BA%D0%BE%D0%B1%D0%B0%D0%B1%D0%B8%D1%87,_%D0%9C%D0%B8%D0%BB%D0%B0%D0%BD'
 
     asyncio.run(main())
