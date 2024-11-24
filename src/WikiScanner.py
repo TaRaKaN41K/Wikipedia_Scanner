@@ -58,12 +58,8 @@ class WikiScanner:
             # # Создаём задачи для проверки всех ссылок
             # for link in links:
             #     tasks.append(self.check_redirect(link))
-            #     await asyncio.sleep(0.1)  # Задержка между задачами
             #
-            # # Ограничиваем параллельность с помощью semaphore
-            # async with self.semaphore:
-            #     # Выполняем задачи параллельно и собираем результаты
-            #     results: list[dict[str, str | None]] = list(await asyncio.gather(*tasks))
+            # results: list[dict[str, str | None]] = list(await asyncio.gather(*tasks))
             #
             # # Распаковываем и объединяем словари
             # for result in results:
@@ -95,9 +91,7 @@ class WikiScanner:
         except Exception as e:
             raise Exception(f"Ошибка проверки перенаправления для {link}: {e}")
 
-    async def start_scanning(self, start_url: str, current_depth: int) -> dict[str, set[str]]:
-
-        print(f"Сканируем уровень {current_depth}, ссылка: {unquote(start_url)}")
+    async def start_scanning(self, start_url: str) -> dict[str, set[str]]:
 
         try:
 

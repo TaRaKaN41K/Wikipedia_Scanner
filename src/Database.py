@@ -38,22 +38,20 @@ class Database:
         self.close()
 
     def insert_link(self, url: str):
-        """
-        Вставляет ссылку на статью в Википедии в таблицу WikiLinks.
-
-        :param url: Ссылка на статью в Википедии.
-        """
+        """ Вставляет ссылку в таблицу WikiLinks. """
         try:
             self.connect()
             self.cursor.execute('''
-            INSERT INTO WikiLinks (url)
-            VALUES (?)
-            ''', (url,))  # Передача url как кортеж
+                INSERT INTO WikiLinks (url)
+                VALUES (?)
+            ''', (url,))
             self.connection.commit()
         except sqlite3.IntegrityError:
             print(f"Ссылка {url} уже существует в базе данных.")
         except Exception as e:
             print(f"Ошибка при вставке ссылки: {e}")
+        finally:
+            self.close()
 
     def fetch_all_links(self) -> list[tuple[int, str]]:
         """
