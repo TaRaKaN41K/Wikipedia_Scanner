@@ -39,17 +39,56 @@ class Database:
 
     def insert_link(self, url: str):
         """ Вставляет ссылку в таблицу WikiLinks. """
+
+        if not url:
+            raise ValueError("URL не может быть None или пустым!")
+
         try:
             self.connect()
+
+            # Проверяем, существует ли ссылка уже в базе
+            self.cursor.execute("SELECT 1 FROM WikiLinks WHERE url = ?", (url,))
+            if self.cursor.fetchone():
+                # print(f"Ссылка {url} уже существует в базе данных.")
+                return  # Возвращаемся, если ссылка уже существует
+
+            # Вставляем новую ссылку
             self.cursor.execute('''
                 INSERT INTO WikiLinks (url)
                 VALUES (?)
             ''', (url,))
             self.connection.commit()
-        except sqlite3.IntegrityError:
-            print(f"Ссылка {url} уже существует в базе данных.")
+
         except Exception as e:
             print(f"Ошибка при вставке ссылки: {e}")
+        finally:
+            self.close()
+
+    def delete_link(self, url: str):
+        """
+        Удаляет ссылку из таблицы WikiLinks.
+
+        :param url: Ссылка, которую нужно удалить.
+        """
+        if not url:
+            raise ValueError("URL не может быть None или пустым!")
+
+        try:
+            self.connect()
+
+            # Проверяем, существует ли ссылка в базе
+            self.cursor.execute("SELECT 1 FROM WikiLinks WHERE url = ?", (url,))
+            if not self.cursor.fetchone():
+                print(f"Ссылка {url} не найдена в базе данных.")
+                return  # Возвращаемся, если ссылка не найдена
+
+            # Удаляем ссылку
+            self.cursor.execute("DELETE FROM WikiLinks WHERE url = ?", (url,))
+            self.connection.commit()
+            print(f"Ссылка {url} успешно удалена из базы данных.")
+
+        except Exception as e:
+            print(f"Ошибка при удалении ссылки: {e}")
         finally:
             self.close()
 
